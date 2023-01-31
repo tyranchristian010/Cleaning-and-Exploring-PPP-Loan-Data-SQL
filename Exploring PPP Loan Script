@@ -1,0 +1,219 @@
+--DATA EXPLORATION
+--1st convert the data type of the ForgivenesAmount column to an integer
+ALTER TABLE [PortfolioProjects].[dbo].[sba_ppp_data]
+ALTER COLUMN [ForgivenessAmount] INT
+
+
+--Summary of all Approved PPP Loans
+SELECT 
+	COUNT(LoanNumber) AS Number_of_Loans,
+	SUM([InitialApprovalAmount]) AS Total_Approved_Amount,
+	AVG([InitialApprovalAmount]) AS Avg_Loan_Amount
+FROM [PortfolioProjects].[dbo].[sba_ppp_data]
+
+
+--Summary of Loan Data by Year
+--Leverage the UNION keyword
+SELECT 
+	YEAR(DateApproved) AS Year,
+	COUNT(LoanNumber) AS Number_of_Loans,
+	SUM([InitialApprovalAmount]) AS Total_Approved_Amount,
+	AVG([InitialApprovalAmount]) AS Avg_Loan_Amount
+FROM [PortfolioProjects].[dbo].[sba_ppp_data]
+WHERE YEAR(DateApproved) = 2020
+GROUP BY YEAR(DateApproved)
+
+UNION
+
+SELECT
+	YEAR(DateApproved) AS Year,
+	COUNT(LoanNumber) AS Number_of_Loans,
+	SUM([InitialApprovalAmount]) AS Total_Approved_Amount,
+	AVG([InitialApprovalAmount]) AS Avg_Loan_Amount
+FROM [PortfolioProjects].[dbo].[sba_ppp_data]
+WHERE YEAR(DateApproved) = 2021
+GROUP BY YEAR(DateApproved)
+GO
+
+
+--Summary of Loan Data by Number of Lenders
+--Leverage the UNION keyword
+SELECT 
+	YEAR(DateApproved) AS Year,
+	COUNT(DISTINCT [OriginatingLender]) AS [OriginatingLender],
+	COUNT(LoanNumber) AS Number_of_Loans,
+	SUM([InitialApprovalAmount]) AS Total_Approved_Amount,
+	AVG([InitialApprovalAmount]) AS Avg_Loan_Amount
+ FROM [PortfolioProjects].[dbo].[sba_ppp_data]
+ WHERE YEAR(DateApproved) = 2020
+ GROUP BY YEAR(DateApproved)
+
+UNION
+
+SELECT 
+	YEAR(DateApproved) AS Year,
+	COUNT(DISTINCT [OriginatingLender]) AS [OriginatingLender],
+	COUNT(LoanNumber) AS Number_of_Loans,
+	SUM([InitialApprovalAmount]) AS Total_Approved_Amount,
+	AVG([InitialApprovalAmount]) AS Avg_Loan_Amount
+FROM [PortfolioProjects].[dbo].[sba_ppp_data]
+WHERE YEAR(DateApproved) = 2021
+GROUP BY YEAR(DateApproved)
+
+
+--TOP 5 [OriginatingLenders] by Total Loans 2020
+SELECT TOP 5
+	[OriginatingLender] AS [OriginatingLender],
+	COUNT(LoanNumber) AS Number_of_Loans,
+	SUM([InitialApprovalAmount]) AS Total_Approved_Amount,
+	AVG([InitialApprovalAmount]) AS Avg_Loan_Amount
+FROM [PortfolioProjects].[dbo].[sba_ppp_data]
+WHERE YEAR(DateApproved) = 2020
+GROUP BY [OriginatingLender]
+ORDER BY Number_of_Loans DESC
+
+
+  --TOP 5 [OriginatingLenders] by Total Loans 2021
+SELECT TOP 5
+	[OriginatingLender] AS [OriginatingLender],
+	COUNT(LoanNumber) AS Number_of_Loans,
+	SUM([InitialApprovalAmount]) AS Total_Approved_Amount,
+	AVG([InitialApprovalAmount]) AS Avg_Loan_Amount
+FROM [PortfolioProjects].[dbo].[sba_ppp_data]
+WHERE YEAR(DateApproved) = 2021
+GROUP BY [OriginatingLender]
+ORDER BY Number_of_Loans DESC
+
+
+--TOP 5 Industries by Total Loans 2020
+--Note: we need the two left most characters in the
+--NAICS code column to match on the LookupCode column.
+SELECT TOP 5
+	[NAICS_Industry_Description],
+	COUNT(LoanNumber) AS Number_of_Loans,
+	SUM([InitialApprovalAmount]) AS Total_Approved_Amount,
+	AVG([InitialApprovalAmount]) AS Avg_Loan_Amount
+FROM [PortfolioProjects].[dbo].[sba_ppp_data] AS p
+  LEFT JOIN [dbo].[sba_naics_sector_codes_description] AS s
+  ON LEFT(p.[NAICSCode],2)=s.LookupCodes
+WHERE YEAR(DateApproved) = 2020
+GROUP BY [NAICS_Industry_Description]
+ORDER BY Total_Approved_Amount DESC
+go
+
+  
+--TOP 5 Sectors by Total Loans 2021. 
+SELECT TOP 5
+	s.[Sector],
+	COUNT(LoanNumber) AS Number_of_Loans,
+	SUM([InitialApprovalAmount]) AS Total_Approved_Amount,
+	AVG([InitialApprovalAmount]) AS Avg_Loan_Amount
+FROM [PortfolioProjects].[dbo].[sba_ppp_data] AS p
+LEFT JOIN [dbo].[sba_naics_sector_codes_description] AS s
+  ON LEFT(p.[NAICSCode],2)=s.LookupCodes
+WHERE YEAR(DateApproved) = 2021
+GROUP BY s.[Sector]
+ORDER BY Total_Approved_Amount DESC
+go
+
+
+--Percent of Total by Sector 2020
+;WITH cte AS( 
+SELECT 
+	s.[Sector],
+	COUNT(LoanNumber) AS Number_of_Loans,
+	SUM([InitialApprovalAmount]) AS Total_Approved_Amount,
+	AVG([InitialApprovalAmount]) AS Avg_Loan_Amount
+FROM [PortfolioProjects].[dbo].[sba_ppp_data] AS p
+LEFT JOIN [dbo].[sba_naics_sector_codes_description] AS s
+  ON LEFT(p.[NAICSCode],2)=s.LookupCodes
+WHERE YEAR(DateApproved) = 2020
+GROUP BY s.[Sector] 
+)
+SELECT
+	[Sector],
+	Number_of_Loans,
+	Total_Approved_Amount,
+	Total_Approved_Amount/sum(Total_Approved_Amount) OVER() *100 AS PercentbyTotal
+FROM cte
+ORDER BY Total_Approved_Amount DESC
+
+
+--Percent of Total by Sector 2021
+;WITH cte AS( 
+SELECT 
+	s.[Sector],
+	COUNT(LoanNumber) AS Number_of_Loans,
+	SUM([InitialApprovalAmount]) AS Total_Approved_Amount,
+	AVG([InitialApprovalAmount]) AS Avg_Loan_Amount
+FROM [PortfolioProjects].[dbo].[sba_ppp_data] AS p
+LEFT JOIN [dbo].[sba_naics_sector_codes_description] AS s
+  ON LEFT(p.[NAICSCode],2)=s.LookupCodes
+WHERE YEAR(DateApproved) = 2021
+GROUP BY s.[Sector]  
+)
+SELECT 
+	[Sector],
+	Number_of_Loans,
+	Total_Approved_Amount,
+	Total_Approved_Amount/sum(Total_Approved_Amount) OVER() *100 AS PercentbyTotal
+FROM cte
+ORDER BY Total_Approved_Amount DESC
+
+
+--Percentage of Loans Forgiven
+SELECT 
+	COUNT(LoanNumber) AS Number_of_Loans,
+	SUM([CurrentApprovalAmount]) AS Total_Approved_Amount_current,
+	AVG([CurrentApprovalAmount]) AS Avg_Loan_Amount_current,
+	SUM([ForgivenessAmount]) AS Amount_Forgiven,
+	SUM([CurrentApprovalAmount])/SUM([ForgivenessAmount])*100 AS Percent_Forgiven
+FROM [PortfolioProjects].[dbo].[sba_ppp_data]
+--WHERE year(dateApproved)=2021
+ORDER BY Number_of_Loans DESC
+go
+
+--Year and Month with the Highest PPP Loans Approved.
+SELECT 
+	YEAR(DateApproved) AS Year_Approved,
+	MONTH(DateApproved) AS Month_Approved,
+	COUNT(LoanNumber) AS Number_of_Loans,
+	SUM([InitialApprovalAmount]) AS Total_Approved_Amount,
+	AVG([InitialApprovalAmount]) AS Avg_Loan_Amount
+FROM [PortfolioProjects].[dbo].[sba_ppp_data]
+GROUP BY YEAR(DateApproved),MONTH(DateApproved)
+ORDER BY Total_Approved_Amount DESC
+go
+
+--Create View to Export as Text File for use in Tableau. 
+CREATE VIEW ppp_main2 AS
+SELECT
+	d.Sector,
+	YEAR(DateApproved) AS year_approved,
+	MONTH(DateApproved) AS month_approved,
+	OriginatingLender,
+	BorrowerState,
+	Race,
+	Gender,
+	Ethnicity,
+
+	COUNT(LoanNumber) As Number_of_Approved,
+	SUM(CurrentApprovalAmount) AS Current_Approved_Amount,
+	AVG(CurrentApprovalAmount) AS Current_Average_Loan_Amount,
+	SUM([ForgivenessAmount]) AS Amount_Forgiven,
+	SUM(InitialApprovalAmount) AS Approved_Amount,
+	AVG(InitialApprovalAmount) AS Average_Loan_Amount
+FROM [dbo].[sba_ppp_data] AS p
+INNER JOIN [dbo].[sba_naics_sector_codes_description] AS d
+	ON LEFT(p.[NAICSCode],2)=d.LookupCodes
+GROUP BY
+	d.Sector,
+	YEAR(DateApproved),
+	MONTH(DateApproved),
+	OriginatingLender,
+	BorrowerState,
+	Race,
+	Gender,
+	Ethnicity
+go
+  SELECT * FROM ppp_main2
