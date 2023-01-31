@@ -1,0 +1,121 @@
+--Overview of the [dbo].[sba_industry_standards] table
+SELECT
+	[NAICS_Codes],
+	[NAICS_Industry_Description]
+FROM [PortfolioProjects].[dbo].[sba_industry_standards]
+
+
+--Retrieve all records where the NAICS_Codes column is blank
+SELECT
+	[NAICS_Codes],
+	[NAICS_Industry_Description]
+FROM [PortfolioProjects].[dbo].[sba_industry_standards]
+WHERE [NAICS_Codes] = ''
+
+
+--Derive a column containing only the numbers in the NAICS_Industry_Description column
+--Alias the column LookupCodes
+SELECT
+	[NAICS_Industry_Description],
+	SUBSTRING([NAICS_Industry_Description],8,2) AS LookupCodes
+FROM [PortfolioProjects].[dbo].[sba_industry_standards]
+WHERE [NAICS_Codes] = ''
+
+
+--Derive the LookupCodes column for only the CASE when a character like '%-%' exits. Else leave the record blank. 
+SELECT
+	[NAICS_Industry_Description],
+	CASE WHEN [NAICS_Industry_Description] LIKE '%–%' 
+		THEN SUBSTRING([NAICS_Industry_Description],8,2) 
+		ELSE '' END AS LookupCodes_case
+  FROM [PortfolioProjects].[dbo].[sba_industry_standards]
+  WHERE NAICS_Codes='';
+GO
+
+
+--Filter out the records where the LookupCodes column is blank
+--Build a CTE
+;WITH CTE AS (
+SELECT
+	[NAICS_Industry_Description],
+	CASE WHEN [NAICS_Industry_Description] LIKE '%–%' 
+		THEN SUBSTRING([NAICS_Industry_Description],8,2) 
+		ELSE '' END AS LookupCodes
+  FROM [PortfolioProjects].[dbo].[sba_industry_standards]
+  WHERE NAICS_Codes=''
+ )
+SELECT
+	*
+FROM CTE
+WHERE LookupCodes !=''
+GO
+
+
+--Derive the Sector column with the extract of all the characters from the NAICS_Industry_Description column that occur after the " - " character.
+--Use the CHARINDEX() to make the "-" character the index start position of the SUBSTRING function.
+;WITH CTE2 AS (
+SELECT
+	[NAICS_Industry_Description],
+	CASE WHEN [NAICS_Industry_Description] LIKE '%–%' 
+		THEN SUBSTRING([NAICS_Industry_Description],8,2) 
+		ELSE '' END AS LookupCodes,
+  SUBSTRING([NAICS_Industry_Description],CHARINDEX('–',[NAICS_Industry_Description])+1,LEN([NAICS_Industry_Description])) AS Sector
+  FROM [PortfolioProjects].[dbo].[sba_industry_standards]
+  WHERE NAICS_Codes=''
+ ) 
+SELECT
+	*
+FROM CTE2
+WHERE LookupCodes !=''
+GO
+
+
+--Dump the CTE INTO a table "sba_naics_sector_codes_description"
+DROP TABLE [PortfolioProjects].[dbo].[sba_naics_sector_codes_description]
+;WITH CTE2 AS (
+SELECT
+	[NAICS_Industry_Description],
+	CASE WHEN [NAICS_Industry_Description] LIKE '%–%' 
+		THEN SUBSTRING([NAICS_Industry_Description],8,2) 
+		ELSE '' END AS LookupCodes,
+  LTRIM(SUBSTRING([NAICS_Industry_Description],CHARINDEX('–',[NAICS_Industry_Description])+1,LEN([NAICS_Industry_Description]))) AS Sector
+  FROM [PortfolioProjects].[dbo].[sba_industry_standards]
+  WHERE NAICS_Codes=''
+ ) 
+SELECT
+	*
+INTO sba_naics_sector_codes_description
+FROM CTE2
+WHERE LookupCodes !=''
+GO
+
+--Now with our new table we can make the adjustments to INSERT extra rows for the NAIC descriptions for 32,33,45 and 49
+SELECT 
+	[NAICS_Industry_Description],
+	[LookupCodes],
+	[Sector]
+FROM [PortfolioProjects].[dbo].[sba_naics_sector_codes_description]
+
+
+--Insert Rows Values(NAICS_Industry_Description, LookupCodes, Sector)
+INSERT INTO [dbo].[sba_naics_sector_codes_description]
+	VALUES ('Sector 31 – 33 – Manufacturing', 32, 'Manufacturing'),
+		   ('Sector 31 – 33 – Manufacturing', 33, 'Manufacturing'),
+		   ('Sector 44 - 45 – Retail Trade', 45, 'Retail Trade'),
+		   ('Sector 48 - 49 – Transportation and Warehousing', 49, 'Transportation and Warehousing')
+
+--Change Record Value
+--Update the description where the LookupCode is 31. 
+--Remove the 33 in front of Manufacturing
+UPDATE [dbo].[sba_naics_sector_codes_description]
+SET Sector = 'Manufacturing'
+WHERE LookupCodes = 31
+
+--Check the Table Updates
+ SELECT 
+	[NAICS_Industry_Description],
+	[LookupCodes],
+	[Sector]
+  FROM [PortfolioProjects].[dbo].[sba_naics_sector_codes_description]
+  ORDER BY LookupCodes
+
